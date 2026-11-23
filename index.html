@@ -8,29 +8,29 @@
     <script src="https://cdn.plot.ly/plotly-2.24.1.min.js"></script>
     <style>
         body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #f4f7f6; margin: 0; padding: 20px; color: #333; }
-        .container { max-width: 1000px; margin: auto; background: white; padding: 25px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); }
+        .container { max-width: 1050px; margin: auto; background: white; padding: 25px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); }
         h1 { color: #1a365d; text-align: center; margin-bottom: 5px; }
         p.subtitle { text-align: center; color: #666; margin-top: 0; }
         .controls { display: flex; gap: 10px; justify-content: center; margin: 20px 0; flex-wrap: wrap; }
-        input { padding: 10px 15px; font-size: 16px; border: 2px solid #cbd5e1; border-radius: 6px; width: 300px; }
+        input { padding: 10px 15px; font-size: 16px; border: 2px solid #cbd5e1; border-radius: 6px; width: 320px; }
         button { padding: 10px 20px; font-size: 16px; background: #2563eb; color: white; border: none; border-radius: 6px; cursor: pointer; }
         button:hover { background: #1d4ed8; }
         .presets { text-align: center; margin-bottom: 20px; }
         .presets button { background: #e2e8f0; color: #1e293b; font-size: 13px; padding: 6px 12px; margin: 3px; }
         .analysis-box { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 15px; margin-bottom: 20px; }
-        .card { background: #f8fafc; padding: 15px; border-left: 4px solid #2563eb; border-radius: 6px; }
-        .card h3 { margin: 0 0 8px 0; font-size: 14px; color: #475569; }
-        .card p { margin: 0; font-size: 16px; font-weight: bold; color: #0f172a; word-break: break-all; }
-        #plot { width: 100%; height: 480px; }
+        .card { background: #f8fafc; padding: 14px; border-left: 4px solid #2563eb; border-radius: 6px; }
+        .card h3 { margin: 0 0 6px 0; font-size: 13px; color: #475569; }
+        .card p { margin: 0; font-size: 14px; font-weight: bold; color: #0f172a; word-break: break-word; }
+        #plot { width: 100%; height: 500px; }
     </style>
 </head>
 <body>
 <div class="container">
     <h1>Symbolic Calculus & Curve Sketching Engine</h1>
-    <p class="subtitle">Real-Time Derivative Analysis & Educational Visualization</p>
+    <p class="subtitle">Real-Time Derivative Analysis, Inflection Points, Asymptotes & Visualization</p>
 
     <div class="controls">
-        <input type="text" id="funcInput" value="x^3 - 3*x" placeholder="Enter f(x), e.g., x^3 - 3*x">
+        <input type="text" id="funcInput" value="x^3 - 3*x" placeholder="Enter f(x), e.g., x^3 - 3*x or 1/(x^2 - 1)">
         <button onclick="analyzeAndPlot()">Analyze & Sketch</button>
     </div>
 
@@ -39,7 +39,7 @@
         <button onclick="setPreset('x^3 - 3*x')">x³ - 3x</button>
         <button onclick="setPreset('sin(x) * exp(-0.2*x)')">Damped Sine</button>
         <button onclick="setPreset('x^4 - 4*x^2 + 2')">x⁴ - 4x² + 2</button>
-        <button onclick="setPreset('1 / (1 + x^2)')">Bell Curve</button>
+        <button onclick="setPreset('1 / (x^2 - 1)')">Vertical Asymptotes</button>
     </div>
 
     <div class="analysis-box">
@@ -55,9 +55,21 @@
             <h3>Second Derivative f''(x)</h3>
             <p id="disp-ddf">-</p>
         </div>
+        <div class="card" style="border-color: #d97706;">
+            <h3>Y-Intercept (x = 0)</h3>
+            <p id="disp-yint">-</p>
+        </div>
         <div class="card" style="border-color: #9333ea;">
-            <h3>Approx. Critical Points (f'(x) ≈ 0)</h3>
+            <h3>Approx. Critical Points</h3>
             <p id="disp-crit">-</p>
+        </div>
+        <div class="card" style="border-color: #0891b2;">
+            <h3>Approx. Inflection Points</h3>
+            <p id="disp-infl">-</p>
+        </div>
+        <div class="card" style="border-color: #be123c;">
+            <h3>Asymptotes / Discontinuities</h3>
+            <p id="disp-asymp">-</p>
         </div>
     </div>
 
@@ -68,6 +80,10 @@
     function setPreset(expr) {
         document.getElementById('funcInput').value = expr;
         analyzeAndPlot();
+    }
+
+    function isValidNum(v) {
+        return typeof v === 'number' && Number.isFinite(v) && Math.abs(v) < 100;
     }
 
     function analyzeAndPlot() {
@@ -85,48 +101,107 @@
             const dfCompiled = df.compile();
             const ddfCompiled = ddf.compile();
 
+            // Y-intercept at x = 0
+            let yAtZero = fCompiled.evaluate({ x: 0 });
+            document.getElementById('disp-yint').innerText = isValidNum(yAtZero) ? `(0, ${yAtZero.toFixed(2)})` : 'Undefined / None';
+
             let xVals = [], yVals = [], dyVals = [], ddyVals = [];
             let critX = [], critY = [], critLabels = [];
+            let inflX = [], inflY = [], inflLabels = [];
+            let asympX = [], asympLabels = [];
 
-            for (let x = -10; x <= 10; x += 0.05) {
-                x = Math.round(x * 100) / 100;
-                let y = fCompiled.evaluate({x: x});
-                let dy = dfCompiled.evaluate({x: x});
-                let ddy = ddfCompiled.evaluate({x: x});
+            let prevX = null, prevY = null, prevDy = null, prevDdy = null;
+
+            for (let i = -200; i <= 200; i++) {
+                let x = Math.round((i * 0.05) * 100) / 100;
+                let yRaw, dyRaw, ddyRaw;
+
+                try { yRaw = fCompiled.evaluate({ x: x }); } catch (e) { yRaw = NaN; }
+                try { dyRaw = dfCompiled.evaluate({ x: x }); } catch (e) { dyRaw = NaN; }
+                try { ddyRaw = ddfCompiled.evaluate({ x: x }); } catch (e) { ddyRaw = NaN; }
+
+                let y = isValidNum(yRaw) ? yRaw : null;
+                let dy = isValidNum(dyRaw) ? dyRaw : null;
+                let ddy = isValidNum(ddyRaw) ? ddyRaw : null;
 
                 xVals.push(x);
-                yVals.push(Math.abs(y) < 100 ? y : null);
-                dyVals.push(Math.abs(dy) < 100 ? dy : null);
-                ddyVals.push(Math.abs(ddy) < 100 ? ddy : null);
+                yVals.push(y);
+                dyVals.push(dy);
+                ddyVals.push(ddy);
 
-                // Detect sign change in f'(x) for critical points
-                if (x > -10) {
-                    let prevDy = dyVals[dyVals.length - 2];
-                    if (prevDy !== null && dy !== null && prevDy * dy <= 0 && Math.abs(y) < 100) {
-                        critX.push(x);
-                        critY.push(y);
-                        critLabels.push(`(${x}, ${y.toFixed(2)})`);
+                // Detect vertical asymptote / discontinuity
+                if (prevX !== null) {
+                    let jumpOccurred = (!isValidNum(yRaw) && isValidNum(prevY)) ||
+                                       (isValidNum(yRaw) && !isValidNum(prevY)) ||
+                                       (y !== null && prevY !== null && Math.abs(y - prevY) > 15);
+                    if (jumpOccurred) {
+                        let ax = ((prevX + x) / 2).toFixed(2);
+                        if (!asympLabels.includes(`x ≈ ${ax}`)) {
+                            asympX.push(parseFloat(ax));
+                            asympLabels.push(`x ≈ ${ax}`);
+                        }
                     }
                 }
+
+                // Critical points (f'(x) sign change)
+                if (prevDy !== null && dy !== null && y !== null && prevDy * dy <= 0) {
+                    critX.push(x);
+                    critY.push(y);
+                    critLabels.push(`(${x}, ${y.toFixed(2)})`);
+                }
+
+                // Inflection points (f''(x) sign change)
+                if (prevDdy !== null && ddy !== null && y !== null && prevDdy * ddy <= 0) {
+                    inflX.push(x);
+                    inflY.push(y);
+                    inflLabels.push(`(${x}, ${y.toFixed(2)})`);
+                }
+
+                prevX = x;
+                prevY = isValidNum(yRaw) ? yRaw : null;
+                prevDy = dy;
+                prevDdy = ddy;
             }
 
-            document.getElementById('disp-crit').innerText = critLabels.length > 0 ? critLabels.join(', ') : 'None in [-10, 10]';
+            // Horizontal asymptote approximation at large |x|
+            let hAsymp = [];
+            try {
+                let yPos = fCompiled.evaluate({ x: 1000 });
+                let yNeg = fCompiled.evaluate({ x: -1000 });
+                if (isValidNum(yPos)) hAsymp.push(`y ≈ ${yPos.toFixed(2)} (x→+∞)`);
+                if (isValidNum(yNeg)) hAsymp.push(`y ≈ ${yNeg.toFixed(2)} (x→-∞)`);
+            } catch (e) {}
 
-            const traceF = { x: xVals, y: yVals, mode: 'lines', name: 'f(x)', line: { color: '#2563eb', width: 3 } };
-            const traceDF = { x: xVals, y: dyVals, mode: 'lines', name: "f'(x) [Slope]", line: { color: '#16a34a', dash: 'dash' } };
-            const traceDDF = { x: xVals, y: ddyVals, mode: 'lines', name: "f''(x) [Concavity]", line: { color: '#dc2626', dash: 'dot' } };
+            document.getElementById('disp-crit').innerText = critLabels.length > 0 ? critLabels.slice(0, 4).join(', ') : 'None in [-10, 10]';
+            document.getElementById('disp-infl').innerText = inflLabels.length > 0 ? inflLabels.slice(0, 4).join(', ') : 'None in [-10, 10]';
+
+            let allAsymp = [...asympLabels, ...hAsymp];
+            document.getElementById('disp-asymp').innerText = allAsymp.length > 0 ? allAsymp.slice(0, 4).join(', ') : 'None detected';
+
+            const traceF = { x: xVals, y: yVals, mode: 'lines', name: 'f(x)', line: { color: '#2563eb', width: 3 }, connectgaps: false };
+            const traceDF = { x: xVals, y: dyVals, mode: 'lines', name: "f'(x) [Slope]", line: { color: '#16a34a', dash: 'dash' }, connectgaps: false };
+            const traceDDF = { x: xVals, y: ddyVals, mode: 'lines', name: "f''(x) [Concavity]", line: { color: '#dc2626', dash: 'dot' }, connectgaps: false };
             const traceCrit = { x: critX, y: critY, mode: 'markers', name: 'Critical Points', marker: { color: '#9333ea', size: 10 } };
+            const traceInfl = { x: inflX, y: inflY, mode: 'markers', name: 'Inflection Points', marker: { color: '#0891b2', symbol: 'diamond', size: 10 } };
+
+            const shapes = asympX.map(ax => ({
+                type: 'line',
+                x0: ax, x1: ax,
+                y0: -15, y1: 15,
+                line: { color: '#be123c', width: 1.5, dash: 'dashdot' }
+            }));
 
             const layout = {
                 title: `Curve Analysis of f(x) = ${exprStr}`,
-                xaxis: { title: 'x', zeroline: true },
+                xaxis: { title: 'x', zeroline: true, range: [-10, 10] },
                 yaxis: { title: 'y', zeroline: true, range: [-15, 15] },
+                shapes: shapes,
                 hovermode: 'closest'
             };
 
-            Plotly.newPlot('plot', [traceF, traceDF, traceDDF, traceCrit], layout);
+            Plotly.newPlot('plot', [traceF, traceDF, traceDDF, traceCrit, traceInfl], layout);
         } catch (err) {
-            alert("Invalid function syntax. Try something like: x^3 - 3*x or sin(x)");
+            alert("Invalid function syntax. Try something like: x^3 - 3*x or 1/(x^2 - 1)");
         }
     }
 
